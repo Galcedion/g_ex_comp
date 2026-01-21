@@ -41,7 +41,10 @@ def compress(args):
 		size_orig = len(raw)
 		print(f'compressing {size_orig} ...')
 		comp_start = time.time()
-	out_full = f_compress(raw,control_sign)
+	if args.fast:
+		out_full = f_compress(raw,control_sign)
+	elif args.veryfast:
+		out_full = ff_compress(raw,control_sign)
 	with open(args.output, 'w+') as stream:
 		stream.write(out_full)
 	if not args.quiet:
@@ -53,6 +56,45 @@ def compress(args):
 		print(f'Down to {size_percent}% in {elapsed_time}s')
 
 def f_compress(raw, control_sign):
+	compress_map = {}
+	word_map = re.split(r'\W+', raw)
+	i = 0
+	while i < len(word_map): # TODO: this might leave an empty last var
+		if len(word_map[i].strip()) < 1:
+			del word_map[i]
+		else:
+			i += 1
+	for i in range(0, len(word_map)):
+		tmp = word_map[i]
+		counter = 1
+		tmp_map = {}
+		while (i + counter) < len(word_map):
+			tmp += f' {word_map[i + counter]}'
+			tmp_gain = len(tmp) - 3
+			if tmp_gain > 0:
+				tmp_count = sum(1 for _ in (re.finditer(tmp, raw)))
+				if tmp_count < 2:
+					break
+				tmp_map[tmp] = {'gain': tmp_gain, 'count': tmp_count, 'truegain': (tmp_gain * tmp_count) - (len(tmp) + 3)}
+			counter += 1
+		if len(tmp_map) == 0:
+			continue
+		tmp_map = dict(sorted(tmp_map.items(), key=lambda item: item[1]['truegain'], reverse=True))
+		tmp_result = next(iter(tmp_map.keys()))
+		compress_map[tmp_result] = tmp_map[tmp_result]
+	out_map = control_sign
+	out_compressed = raw
+	map_id = 1
+	for i in compress_map:
+		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > sum(1 for _ in (re.finditer(i, out_compressed))):
+			continue
+		out_compressed = out_compressed.replace(i, f'{control_sign}{map_id}{control_sign}')
+		out_map += f'{control_sign}{map_id}{control_sign}{i}'
+		map_id += 1
+	out_map += control_sign + control_sign
+	return out_map + out_compressed
+
+def ff_compress(raw, control_sign):
 	compress_map = {}
 	for i in re.split(r'\W+', raw):
 		if len(i) < 4:
@@ -93,7 +135,7 @@ def decompress(args):
 	split_index = raw.find(control_sign + control_sign, 2)
 	compress_map = raw[0:split_index + 1]
 	decompressed = raw[split_index + 2:]
-	re_string = f'\\{control_sign}\\d+\\{control_sign}\\w+[^\\{control_sign}]'
+	re_string = f'\\{control_sign}\\d+\\{control_sign}[\\w ]+[^\\{control_sign}]'
 	compress_items = re.findall(re_string, compress_map)
 	for i in compress_items:
 		med_pos = i.find(control_sign, 1)
