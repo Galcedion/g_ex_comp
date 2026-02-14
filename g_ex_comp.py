@@ -90,9 +90,9 @@ def n_compress(raw, control_sign):
 			tmp = raw[i:j]
 			tmp_gain = len(tmp) - 3
 			tmp_count = _util_findstrmatches(tmp, raw)
-			if tmp_count < 2:
+			if tmp_count < 2 or tmp_maxgain > (tmp_gain * tmp_count) - (len(tmp) + 3):
 				break
-			elif tmp_maxgain > (tmp_gain * tmp_count) - (len(tmp) + 3) or tmp in compress_map:
+			elif tmp in compress_map:
 				continue
 			tmp_result = tmp
 			tmp_maxgain = (tmp_gain * tmp_count) - (len(tmp) + 3)
@@ -192,7 +192,7 @@ def decompress(args):
 	split_index = raw.find(control_sign + control_sign, 2)
 	compress_map = raw[0:split_index + 1]
 	decompressed = raw[split_index + 2:]
-	re_string = f'\\{control_sign}\\d+\\{control_sign}[\\w ]+[^\\{control_sign}]'
+	re_string = f'\\{control_sign}\\d+\\{control_sign}[^\\{control_sign}]+'
 	compress_items = re.findall(re_string, compress_map)
 	for i in compress_items:
 		med_pos = i.find(control_sign, 1)
