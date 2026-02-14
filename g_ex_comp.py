@@ -11,6 +11,7 @@ def main():
 	parser = argparse.ArgumentParser(prog = 'g_ex_comp', description = 'Experimental (de)compression, not intended for production use!')
 	parser.add_argument('-c', '--compress', help='file to compress')
 	parser.add_argument('-d', '--decompress', help='file to decompress')
+	parser.add_argument('-n', '--normal', action='store_true', help='normal compression based on string sections')
 	parser.add_argument('-f', '--fast', action='store_true', help='fast compression based on full word phrases')
 	parser.add_argument('-ff', '--veryfast', action='store_true', help='very fast compression based on full words only')
 	parser.add_argument('-o', '--output', help='output file')
@@ -45,6 +46,8 @@ def compress(args):
 		out_full = f_compress(raw,control_sign)
 	elif args.veryfast:
 		out_full = ff_compress(raw,control_sign)
+	elif args.normal:
+		out_full = n_compress(raw, control_sign)
 	with open(args.output, 'w+') as stream:
 		stream.write(out_full)
 	if not args.quiet:
@@ -54,6 +57,60 @@ def compress(args):
 		elapsed_time = round(comp_end - comp_start, 2)
 		print(f'compressed to {size_final}')
 		print(f'Down to {size_percent}% in {elapsed_time}s')
+
+def _util_findstrmatches(sub, s):
+	counter = 0
+	i = 0
+	while True:
+		i = s.find(sub, i)
+		if i == -1:
+			break
+		counter += 1
+		i += len(sub)
+	return counter
+
+def _util_mapcheck(s, mapkeys):
+	for i in mapkeys:
+		if s in i:
+			return True
+	return False
+
+def n_compress(raw, control_sign):
+	compress_map = {}
+	min_length = 4
+	max_length = int(len(raw) / 3)
+	i = 0
+	while i < (len(raw) - min_length * 2):
+		j = i + min_length
+		tmp_result = ''
+		tmp_maxgain = 0
+		tmp_maxcount = 0
+		while j < (len(raw) - min_length):
+			j += 1
+			tmp = raw[i:j]
+			tmp_gain = len(tmp) - 3
+			tmp_count = _util_findstrmatches(tmp, raw)
+			if tmp_count < 2:
+				break
+			elif tmp_maxgain > (tmp_gain * tmp_count) - (len(tmp) + 3) or tmp in compress_map:
+				continue
+			tmp_result = tmp
+			tmp_maxgain = (tmp_gain * tmp_count) - (len(tmp) + 3)
+			tmp_maxcount = tmp_count
+		if not _util_mapcheck(tmp_result, compress_map.keys()):
+			compress_map[tmp_result] = {'gain': len(tmp_result) - 3, 'count': tmp_maxcount, 'truegain': tmp_maxgain}
+		i += 1
+	out_map = control_sign
+	out_compressed = raw
+	map_id = 1
+	for i in compress_map:
+		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > _util_findstrmatches(i, out_compressed):
+			continue
+		out_compressed = out_compressed.replace(i, f'{control_sign}{map_id}{control_sign}')
+		out_map += f'{control_sign}{map_id}{control_sign}{i}'
+		map_id += 1
+	out_map += control_sign + control_sign
+	return out_map + out_compressed
 
 def f_compress(raw, control_sign):
 	compress_map = {}
