@@ -6,6 +6,8 @@ import sys
 import time
 
 control_sign_list = ['|', '[', ']', '{', '}']
+control_sign = ''
+raw = ''
 
 def main():
 	parser = argparse.ArgumentParser(prog = 'g_ex_comp', description = 'Experimental (de)compression, not intended for production use!')
@@ -26,6 +28,8 @@ def main():
 		decompress(args)
 
 def compress(args):
+	global control_sign
+	global raw
 	if not os.path.isfile(args.compress):
 		print('Source does not exist. Terminating.')
 	with open(args.compress, 'r') as stream:
@@ -43,11 +47,11 @@ def compress(args):
 		print(f'compressing {size_orig} ...')
 		comp_start = time.time()
 	if args.fast:
-		out_full = f_compress(raw,control_sign)
+		out_full = f_compress()
 	elif args.veryfast:
-		out_full = ff_compress(raw,control_sign)
+		out_full = ff_compress()
 	elif args.normal:
-		out_full = n_compress(raw, control_sign)
+		out_full = n_compress()
 	with open(args.output, 'w+') as stream:
 		stream.write(out_full)
 	if not args.quiet:
@@ -75,7 +79,25 @@ def _util_mapcheck(s, mapkeys):
 			return True
 	return False
 
-def n_compress(raw, control_sign):
+def _util_build_compressed(compress_map):
+	global control_sign
+	global raw
+	compress_map = dict(sorted(compress_map.items(), key=lambda item: item[1]['truegain'], reverse=True))
+	out_map = control_sign
+	out_compressed = raw
+	map_id = 1
+	for i in compress_map:
+		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > _util_findstrmatches(i, out_compressed):
+			continue
+		out_compressed = out_compressed.replace(i, f'{control_sign}{map_id}{control_sign}')
+		out_map += f'{control_sign}{map_id}{control_sign}{i}'
+		map_id += 1
+	out_map += control_sign + control_sign
+	return out_map + out_compressed
+
+def n_compress():
+	global control_sign
+	global raw
 	compress_map = {}
 	min_length = 4
 	max_length = int(len(raw) / 3)
@@ -100,19 +122,11 @@ def n_compress(raw, control_sign):
 		if not _util_mapcheck(tmp_result, compress_map.keys()):
 			compress_map[tmp_result] = {'gain': len(tmp_result) - 3, 'count': tmp_maxcount, 'truegain': tmp_maxgain}
 		i += 1
-	out_map = control_sign
-	out_compressed = raw
-	map_id = 1
-	for i in compress_map:
-		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > _util_findstrmatches(i, out_compressed):
-			continue
-		out_compressed = out_compressed.replace(i, f'{control_sign}{map_id}{control_sign}')
-		out_map += f'{control_sign}{map_id}{control_sign}{i}'
-		map_id += 1
-	out_map += control_sign + control_sign
-	return out_map + out_compressed
+	return _util_build_compressed(compress_map)
 
-def f_compress(raw, control_sign):
+def f_compress():
+	global control_sign
+	global raw
 	compress_map = {}
 	word_map = re.split(r'\W+', raw)
 	i = 0
@@ -139,19 +153,11 @@ def f_compress(raw, control_sign):
 		tmp_map = dict(sorted(tmp_map.items(), key=lambda item: item[1]['truegain'], reverse=True))
 		tmp_result = next(iter(tmp_map.keys()))
 		compress_map[tmp_result] = tmp_map[tmp_result]
-	out_map = control_sign
-	out_compressed = raw
-	map_id = 1
-	for i in compress_map:
-		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > sum(1 for _ in (re.finditer(i, out_compressed))):
-			continue
-		out_compressed = out_compressed.replace(i, f'{control_sign}{map_id}{control_sign}')
-		out_map += f'{control_sign}{map_id}{control_sign}{i}'
-		map_id += 1
-	out_map += control_sign + control_sign
-	return out_map + out_compressed
+	return _util_build_compressed(compress_map)
 
-def ff_compress(raw, control_sign):
+def ff_compress():
+	global control_sign
+	global raw
 	compress_map = {}
 	for i in re.split(r'\W+', raw):
 		if len(i) < 4:
@@ -168,18 +174,7 @@ def ff_compress(raw, control_sign):
 		compress_map[i]['gain'] = len(i) - (2 + len(str(map_index)))
 		compress_map[i]['truegain'] = (compress_map[i]['count'] * compress_map[i]['gain']) - (len(i) + (2 + len(str(map_index))))
 		map_index += 1
-	compress_map = dict(sorted(compress_map.items(), key=lambda item: item[1]['truegain'], reverse=True))
-	out_map = control_sign
-	out_compressed = raw
-	map_id = 1
-	for i in compress_map:
-		if compress_map[i]['truegain'] <= 1:
-			continue
-		out_compressed = out_compressed.replace(i, f'{control_sign}{map_id}{control_sign}')
-		out_map += f'{control_sign}{map_id}{control_sign}{i}'
-		map_id += 1
-	out_map += control_sign + control_sign
-	return out_map + out_compressed
+	return _util_build_compressed(compress_map)
 
 def decompress(args):
 	if not os.path.isfile(args.decompress):
