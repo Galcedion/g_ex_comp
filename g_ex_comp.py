@@ -32,6 +32,7 @@ def compress(args):
 	global raw
 	if not os.path.isfile(args.compress):
 		print('Source does not exist. Terminating.')
+		sys.exit(0)
 	with open(args.compress, 'r') as stream:
 		raw = stream.read()
 	control_sign = False
@@ -82,6 +83,9 @@ def _util_mapcheck(s, mapkeys):
 def _util_build_compressed(compress_map):
 	global control_sign
 	global raw
+	if(len(compress_map) == 0):
+		print('Nothing to compress!')
+		return raw
 	compress_map = dict(sorted(compress_map.items(), key=lambda item: item[1]['truegain'], reverse=True))
 	out_map = control_sign
 	out_compressed = raw
@@ -110,12 +114,12 @@ def n_compress():
 		while j < (len(raw) - min_length):
 			j += 1
 			tmp = raw[i:j]
+			if tmp in compress_map:
+				continue
 			tmp_gain = len(tmp) - 3
 			tmp_count = _util_findstrmatches(tmp, raw)
 			if tmp_count < 2 or tmp_maxgain > (tmp_gain * tmp_count) - (len(tmp) + 3):
 				break
-			elif tmp in compress_map:
-				continue
 			tmp_result = tmp
 			tmp_maxgain = (tmp_gain * tmp_count) - (len(tmp) + 3)
 			tmp_maxcount = tmp_count
@@ -143,7 +147,7 @@ def f_compress():
 			tmp += f' {word_map[i + counter]}'
 			tmp_gain = len(tmp) - 3
 			if tmp_gain > 0:
-				tmp_count = sum(1 for _ in (re.finditer(tmp, raw)))
+				tmp_count = _util_findstrmatches(tmp, raw)
 				if tmp_count < 2:
 					break
 				tmp_map[tmp] = {'gain': tmp_gain, 'count': tmp_count, 'truegain': (tmp_gain * tmp_count) - (len(tmp) + 3)}
@@ -179,10 +183,12 @@ def ff_compress():
 def decompress(args):
 	if not os.path.isfile(args.decompress):
 		print('Source does not exist. Terminating.')
+		sys.exit(0)
 	with open(args.decompress, 'r') as stream:
 		raw = stream.read()
 	if raw[0] != raw[1] or raw[0] not in control_sign_list:
 		print('Source seemingly not compressed. Terminating.')
+		sys.exit(0)
 	control_sign = raw[0]
 	split_index = raw.find(control_sign + control_sign, 2)
 	compress_map = raw[0:split_index + 1]
