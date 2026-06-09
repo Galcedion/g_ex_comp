@@ -137,12 +137,16 @@ def n_compress():
 	global raw
 	threat_count = 8
 	thread_list = []
-	section = int(math.ceil(len(raw) / threat_count))
+	threat_pool = threat_count * (threat_count + 1) / 2
+	section = int(math.ceil(len(raw) / threat_pool))
+	first = 0
+	last = 0
 	for i in range(0, threat_count):
-		last = (i+1)*section - 1
-		if last > len(raw):
+		first = last + 1
+		last = last + (i+1)*section - 1
+		if last > len(raw) or i == (threat_count - 1):
 			last = len(raw)
-		ts = threaded_search(i*section, last)
+		ts = threaded_search(first, last)
 		ts.start()
 		thread_list.append(ts)
 	compress_map = {}
