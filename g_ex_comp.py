@@ -20,15 +20,27 @@ class threaded_search(threading.Thread):
 	def run(self):
 		global raw
 		min_length = 4
-		max_length = int(len(raw) / 3)
+		maxgain = 0
+		max_length = 0
+		cur_length = 1
+		while cur_length < len(raw):
+			hits = math.floor(len(raw) / (min_length - 1 + cur_length))
+			gain = hits * cur_length
+			if gain > maxgain:
+				maxgain = gain
+				max_length = cur_length
+				cur_length += 1
+			else:
+				break
 		while self.t_start < self.t_end:
-			j = self.t_start + min_length
+			strip_end = self.t_start + min_length
+			strip_cutoff = self.t_start + max_length
 			tmp_result = ''
 			tmp_maxgain = 0
 			tmp_maxcount = 0
-			while j < (len(raw) - min_length):
-				j += 1
-				tmp = raw[self.t_start:j]
+			while strip_end < (len(raw) - min_length) and strip_end <= strip_cutoff:
+				tmp = raw[self.t_start:strip_end]
+				strip_end += 1
 				if tmp in self.compress_map:
 					continue
 				tmp_gain = len(tmp) - 3
