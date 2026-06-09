@@ -1,30 +1,38 @@
+import os
 import subprocess
 import sys
 import time
 import unittest
 
+path_self = os.path.dirname(os.path.abspath(__file__))
+path_parent = path_self[0:path_self.rfind('/')]
+path_masterfile = os.path.join(path_parent, 'g_ex_comp.py')
+path_testfile_in = os.path.join(path_self, 'testfile_in')
+path_testfile_comp = os.path.join(path_self, 'testfile_comp')
+path_testfile_decomp = os.path.join(path_self, 'testfile_decomp')
+
 class Test_g_ex_comp(unittest.TestCase):
 	def test_n(self):
-		subprocess.run(['python3', '../g_ex_comp.py', '-c', 'testfile_in', '-o', 'testfile_comp', '-n', '-q'])
-		subprocess.run(['python3', '../g_ex_comp.py', '-d', 'testfile_comp', '-o', 'testfile_decomp'])
-		check = subprocess.run(['diff', 'testfile_in', 'testfile_decomp'], capture_output=True, text=True)
+		subprocess.run(['python3', path_masterfile, '-c', path_testfile_in, '-o', path_testfile_comp, '-n', '-q'])
+		subprocess.run(['python3', path_masterfile, '-d', path_testfile_comp, '-o', path_testfile_decomp])
+		check = subprocess.run(['diff', path_testfile_in, path_testfile_decomp], capture_output=True, text=True)
 		self.assertEqual(check.stdout, '')
 
 	def test_f(self):
-		subprocess.run(['python3', '../g_ex_comp.py', '-c', 'testfile_in', '-o', 'testfile_comp', '-f', '-q'])
-		subprocess.run(['python3', '../g_ex_comp.py', '-d', 'testfile_comp', '-o', 'testfile_decomp'])
-		check = subprocess.run(['diff', 'testfile_in', 'testfile_decomp'], capture_output=True, text=True)
+		subprocess.run(['python3', path_masterfile, '-c', path_testfile_in, '-o', path_testfile_comp, '-f', '-q'])
+		subprocess.run(['python3', path_masterfile, '-d', path_testfile_comp, '-o', path_testfile_decomp])
+		check = subprocess.run(['diff', path_testfile_in, path_testfile_decomp], capture_output=True, text=True)
 		self.assertEqual(check.stdout, '')
 
 	def test_ff(self):
-		subprocess.run(['python3', '../g_ex_comp.py', '-c', 'testfile_in', '-o', 'testfile_comp', '-ff', '-q'])
-		subprocess.run(['python3', '../g_ex_comp.py', '-d', 'testfile_comp', '-o', 'testfile_decomp'])
-		check = subprocess.run(['diff', 'testfile_in', 'testfile_decomp'], capture_output=True, text=True)
+		subprocess.run(['python3', path_masterfile, '-c', path_testfile_in, '-o', path_testfile_comp, '-ff', '-q'])
+		subprocess.run(['python3', path_masterfile, '-d', path_testfile_comp, '-o', path_testfile_decomp])
+		check = subprocess.run(['diff', path_testfile_in, path_testfile_decomp], capture_output=True, text=True)
 		self.assertEqual(check.stdout, '')
 
 def create_testfile():
 	print('Generating test file.')
-	with open('wordlist', 'r') as stream:
+	with open(os.path.join(path_self, 'wordlist'), 'r') as stream:
 		wordlist = stream.read().split()
 	seed = int(time.time())
 	step = (seed % 25) + 10
@@ -54,7 +62,7 @@ def create_testfile():
 			testcontent += '\n'
 			seed += 1
 		i += 1
-	with open('testfile_in', 'w+') as stream:
+	with open(path_testfile_in, 'w+') as stream:
 		stream.write(testcontent.strip())
 	print('Done. Testing ...')
 
