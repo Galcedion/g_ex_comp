@@ -4,55 +4,11 @@ import math
 import os.path
 import re
 import sys
-import threading
 import time
 
 control_sign_list = ['|', '[', ']', '{', '}']
 control_sign = ''
 raw = ''
-
-class threaded_search(threading.Thread):
-	def __init__(self, t_start, t_end):
-		threading.Thread.__init__(self)
-		self.t_start = t_start
-		self.t_end = t_end
-		self.compress_map = {}
-	def run(self):
-		global raw
-		min_length = 4
-		maxgain = 0
-		max_length = 0
-		cur_length = 1
-		while cur_length < len(raw):
-			hits = math.floor(len(raw) / (min_length - 1 + cur_length))
-			gain = hits * cur_length
-			if gain > maxgain:
-				maxgain = gain
-				max_length = cur_length
-				cur_length += 1
-			else:
-				break
-		while self.t_start < self.t_end:
-			strip_end = self.t_start + min_length
-			strip_cutoff = self.t_start + max_length
-			tmp_result = ''
-			tmp_maxgain = 0
-			tmp_maxcount = 0
-			while strip_end < (len(raw) - min_length) and strip_end <= strip_cutoff:
-				tmp = raw[self.t_start:strip_end]
-				strip_end += 1
-				if tmp in self.compress_map:
-					continue
-				tmp_gain = len(tmp) - 3
-				tmp_count = _util_findstrmatches(tmp, raw)
-				if tmp_count < 2 or tmp_maxgain > (tmp_gain * tmp_count) - (len(tmp) + 3):
-					break
-				tmp_result = tmp
-				tmp_maxgain = (tmp_gain * tmp_count) - (len(tmp) + 3)
-				tmp_maxcount = tmp_count
-			if not _util_mapcheck(tmp_result, self.compress_map.keys()):
-				self.compress_map[tmp_result] = {'gain': len(tmp_result) - 3, 'count': tmp_maxcount, 'truegain': tmp_maxgain}
-			self.t_start += 1
 
 def main():
 	parser = argparse.ArgumentParser(prog = 'g_ex_comp', description = 'Experimental (de)compression, not intended for production use!')
@@ -147,24 +103,29 @@ def _util_build_compressed(compress_map):
 def n_compress():
 	global control_sign
 	global raw
-	threat_count = 8
-	thread_list = []
-	threat_pool = threat_count * (threat_count + 1) / 2
-	section = int(math.ceil(len(raw) / threat_pool))
-	first = 0
-	last = 0
-	for i in range(0, threat_count):
-		first = last + 1
-		last = last + (i+1)*section - 1
-		if last > len(raw) or i == (threat_count - 1):
-			last = len(raw)
-		ts = threaded_search(first, last)
-		ts.start()
-		thread_list.append(ts)
+	min_length = 4
+	cur_pos = 0
 	compress_map = {}
-	for i in thread_list:
-		i.join()
-		compress_map.update(i.compress_map)
+	while cur_pos < len(raw) - min_length:
+		strip_end = cur_pos + min_length
+		tmp_result = ''
+		tmp_maxgain = 0
+		tmp_maxcount = 0
+		while strip_end < (len(raw) - min_length):
+			tmp = raw[cur_pos:strip_end]
+			strip_end += 1
+			if tmp in compress_map:
+				continue
+			tmp_gain = len(tmp) - 3
+			tmp_count = _util_findstrmatches(tmp, raw[cur_pos:])
+			if tmp_count < 2 or tmp_maxgain > (tmp_gain * tmp_count) - (len(tmp) + 3):
+				break
+			tmp_result = tmp
+			tmp_maxgain = (tmp_gain * tmp_count) - (len(tmp) + 3)
+			tmp_maxcount = tmp_count
+		if not _util_mapcheck(tmp_result, compress_map.keys()):
+			compress_map[tmp_result] = {'gain': len(tmp_result) - 3, 'count': tmp_maxcount, 'truegain': tmp_maxgain}
+		cur_pos += 1
 	return _util_build_compressed(compress_map)
 
 def f_compress():
