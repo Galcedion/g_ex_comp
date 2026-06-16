@@ -9,6 +9,7 @@ import time
 control_sign_list = ['|', '[', ']', '{', '}']
 control_sign = ''
 raw = ''
+header_map = {}
 
 def main():
 	parser = argparse.ArgumentParser(prog = 'g_ex_comp', description = 'Experimental (de)compression, not intended for production use!')
@@ -17,11 +18,17 @@ def main():
 	parser.add_argument('-n', '--normal', action='store_true', help='normal compression based on string sections')
 	parser.add_argument('-f', '--fast', action='store_true', help='fast compression based on full word phrases')
 	parser.add_argument('-ff', '--veryfast', action='store_true', help='very fast compression based on full words only')
+	parser.add_argument('-i', '--iterations', help='number of times the compression is to be run')
 	parser.add_argument('-o', '--output', help='output file')
 	parser.add_argument('-q', '--quiet', action='store_true', help='no information in stdout except for error messages')
 	args = parser.parse_args()
 	if (args.compress is None and args.decompress is None) or (args.compress is not None and args.decompress is not None):
 		print('Faulty input. Terminating.')
+		sys.exit(0)
+	if args.iterations is None:
+		args.iterations = 1
+	elif int(args.iterations) < 1:
+		print('Compression has to be run at least once. Terminating.')
 		sys.exit(0)
 	if args.compress is not None:
 		compress(args)
@@ -31,6 +38,7 @@ def main():
 def compress(args):
 	global control_sign
 	global raw
+	global header_map
 	if not os.path.isfile(args.compress):
 		print('Source does not exist. Terminating.')
 		sys.exit(0)
@@ -48,12 +56,15 @@ def compress(args):
 		size_orig = len(raw)
 		print(f'compressing {size_orig} ...')
 		comp_start = time.time()
-	if args.fast:
-		out_full = f_compress()
-	elif args.veryfast:
-		out_full = ff_compress()
-	elif args.normal:
-		out_full = n_compress()
+	out_compressed = ''
+	for i in range(int(args.iterations)):
+		if args.fast:
+			f_compress()
+		elif args.veryfast:
+			ff_compress()
+		elif args.normal:
+			n_compress()
+	out_full = _util_buil_out()
 	with open(args.output, 'w+') as stream:
 		stream.write(out_full)
 	if not args.quiet:
@@ -81,24 +92,32 @@ def _util_mapcheck(s, mapkeys):
 			return True
 	return False
 
-def _util_build_compressed(compress_map):
+def _util_build_compression(compress_map):
 	global control_sign
 	global raw
+	global header_map
+	map_id = len(header_map) + 1
 	if(len(compress_map) == 0):
 		print('Nothing to compress!')
 		return raw
 	compress_map = dict(sorted(compress_map.items(), key=lambda item: item[1]['truegain'], reverse=True))
-	out_map = control_sign
-	out_compressed = raw
-	map_id = 1
 	for i in compress_map:
-		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > _util_findstrmatches(i, out_compressed):
+		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > _util_findstrmatches(i, raw):
 			continue
-		out_compressed = out_compressed.replace(i, f'{control_sign}{map_id}{control_sign}')
-		out_map += f'{control_sign}{map_id}{control_sign}{i}'
+		raw = raw.replace(i, f'{control_sign}{map_id}{control_sign}')
+		header_map[map_id] = i
 		map_id += 1
-	out_map += control_sign + control_sign
-	return out_map + out_compressed
+
+def _util_buil_out():
+	global control_sign
+	global raw
+	global header_map
+	out_header = control_sign
+	for i in header_map:
+		out_header += f'{control_sign}{i}{control_sign}{header_map[i]}'
+	out_header += control_sign + control_sign
+	print(out_header)
+	return out_header + raw
 
 def n_compress():
 	global control_sign
@@ -107,6 +126,9 @@ def n_compress():
 	cur_pos = 0
 	compress_map = {}
 	while cur_pos < len(raw) - min_length:
+		if raw[cur_pos] == control_sign:
+			cur_pos = raw.find(control_sign, cur_pos + 1) + 1
+			continue
 		strip_end = cur_pos + min_length
 		tmp_result = ''
 		tmp_maxgain = 0
@@ -126,7 +148,7 @@ def n_compress():
 		if not _util_mapcheck(tmp_result, compress_map.keys()):
 			compress_map[tmp_result] = {'gain': len(tmp_result) - 3, 'count': tmp_maxcount, 'truegain': tmp_maxgain}
 		cur_pos += 1
-	return _util_build_compressed(compress_map)
+	return _util_build_compression(compress_map)
 
 def f_compress():
 	global control_sign
@@ -157,7 +179,7 @@ def f_compress():
 		tmp_map = dict(sorted(tmp_map.items(), key=lambda item: item[1]['truegain'], reverse=True))
 		tmp_result = next(iter(tmp_map.keys()))
 		compress_map[tmp_result] = tmp_map[tmp_result]
-	return _util_build_compressed(compress_map)
+	return _util_build_compression(compress_map)
 
 def ff_compress():
 	global control_sign
@@ -178,7 +200,7 @@ def ff_compress():
 		compress_map[i]['gain'] = len(i) - (2 + len(str(map_index)))
 		compress_map[i]['truegain'] = (compress_map[i]['count'] * compress_map[i]['gain']) - (len(i) + (2 + len(str(map_index))))
 		map_index += 1
-	return _util_build_compressed(compress_map)
+	return _util_build_compression(compress_map)
 
 def decompress(args):
 	if not os.path.isfile(args.decompress):
