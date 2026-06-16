@@ -116,7 +116,6 @@ def _util_buil_out():
 	for i in header_map:
 		out_header += f'{control_sign}{i}{control_sign}{header_map[i]}'
 	out_header += control_sign + control_sign
-	print(out_header)
 	return out_header + raw
 
 def n_compress():
@@ -136,6 +135,8 @@ def n_compress():
 		while strip_end < (len(raw) - min_length):
 			tmp = raw[cur_pos:strip_end]
 			strip_end += 1
+			if control_sign in tmp:
+				break
 			if tmp in compress_map:
 				continue
 			tmp_gain = len(tmp) - 3
@@ -163,6 +164,8 @@ def f_compress():
 			i += 1
 	for i in range(0, len(word_map)):
 		tmp = word_map[i]
+		if control_sign in tmp:
+			continue
 		counter = 1
 		tmp_map = {}
 		while (i + counter) < len(word_map):
@@ -186,7 +189,7 @@ def ff_compress():
 	global raw
 	compress_map = {}
 	for i in re.split(r'\W+', raw):
-		if len(i) < 4:
+		if len(i) < 4 or control_sign in i:
 			continue
 		if i in compress_map:
 			compress_map[i]['count'] += 1
