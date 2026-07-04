@@ -3,6 +3,7 @@ import argparse
 import math
 import os.path
 import re
+import string
 import sys
 import time
 
@@ -104,8 +105,17 @@ def _util_build_compression(compress_map):
 	for i in compress_map:
 		if compress_map[i]['truegain'] <= 1 or compress_map[i]['count'] > _util_findstrmatches(i, raw):
 			continue
-		raw = raw.replace(i, f'{control_sign}{map_id}{control_sign}')
-		header_map[map_id] = i
+		# shorten the ID by converting to alnum (256 unicode led to some issues)
+		# TODO: currently has a limit of 3844 - 1 ids
+		alnum = string.ascii_lowercase + string.ascii_uppercase + string.digits
+		map_id_converted = math.floor(map_id / len(alnum))
+		if map_id_converted == 0:
+			map_id_converted = ''
+		else:
+			map_id_converted = alnum[map_id_converted]
+		map_id_converted = alnum[(map_id % len(alnum))] + map_id_converted
+		raw = raw.replace(i, f'{control_sign}{map_id_converted}{control_sign}')
+		header_map[map_id_converted] = i
 		map_id += 1
 
 def _util_buil_out():
@@ -218,7 +228,7 @@ def decompress(args):
 	split_index = raw.find(control_sign + control_sign, 2)
 	compress_map = raw[0:split_index + 1]
 	decompressed = raw[split_index + 2:]
-	re_string = f'\\{control_sign}\\d+\\{control_sign}[^\\{control_sign}]+'
+	re_string = f'\\{control_sign}\\w+\\{control_sign}[^\\{control_sign}]+'
 	compress_items = re.findall(re_string, compress_map)
 	for i in compress_items:
 		med_pos = i.find(control_sign, 1)
@@ -230,3 +240,22 @@ def decompress(args):
 
 if __name__ == '__main__':
 	main()
+
+	# stuff from attempts to replace ids or raw with binary
+	#out_full = ' '.join(format(ord(char),'b').zfill(8) for char in out_full)
+	#out_bytes = bytearray()
+	#for of in out_full.split(' '):
+		#of = int(of)
+		#of = bytes(of, encoding='utf-8')
+		#of = of.encode('utf-8')
+		#print(of)
+		#of = of.encode('utf-8')
+		#out_bytes.extend(map(ord, of))
+		#of = bytearray(of)
+		#b_length = math.floor(pow(map_id, (1 / 8)))
+		#map_id_b = map_id.to_bytes(b_length, byteorder='big')
+		#stream.write(base64.b64encode(of))
+		#stream.write(int(5).to_bytes(8, byteorder='big'))
+		#stream.write(bin(int(of)).encode())
+		#stream.write(bin(int(of)))
+	#stream.write(out_bytes)
